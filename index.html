@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>哩程攻略 v8.4 (最終完全版)</title>
+  <title>哩程攻略 v8.5 (Live+通路修正版)</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Varela+Round&family=Mali:wght@500;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -11,7 +11,7 @@
 
   <style>
     /* =========================
-       CSS 樣式表 (v8.1~v8.4 統一風格)
+       CSS 樣式表 (v8.1~v8.5 統一風格)
        ========================= */
     :root {
       --bg-main: #fffdf9;
@@ -208,8 +208,8 @@
     <div class="d-flex align-items-center">
       <div class="header-icon"><i class="fa-solid fa-plane-departure"></i></div>
       <div class="header-title">
-        <h5>哩程攻略 v8.4</h5>
-        <small>最終完全版</small>
+        <h5>哩程攻略 v8.5</h5>
+        <small>Live+ 通路完全修正版</small>
       </div>
     </div>
     <button class="btn-header" onclick="openSettings()"><i class="fa-solid fa-gear me-1"></i> 設定</button>
@@ -276,7 +276,7 @@
             <option value="flight_cx">🌲 國泰官網</option>
             <option value="flight_other">✈️ 其他航空</option>
           </select>
-          <input type="text" id="keyword-input" class="form-control" placeholder="輸入店家關鍵字 (如: Agoda, Uniqlo)..." style="font-size:0.9rem;">
+          <input type="text" id="keyword-input" class="form-control" placeholder="輸入店家關鍵字 (如: Momo, Uniqlo, 威秀)..." style="font-size:0.9rem;">
         </div>
 
         <button onclick="calculate()" class="btn-action">開始計算 <i class="fa-solid fa-calculator ms-2"></i></button>
@@ -386,7 +386,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     /* =========================
-       哩程攻略 v8.4 - 最終完全版
+       哩程攻略 v8.5 - Live+ 通路完全修正版
        ========================= */
 
     const BUILTIN_DEFS = [
@@ -409,10 +409,41 @@
       'select': ['carrefour','全聯','中油','台亞','高鐵','uber']
     };
 
-    // Live+ 關鍵字
+    // Live+ 關鍵字庫 (v8.5 修正: 包含指定網購平台與娛樂)
     const LIVE_KEYWORDS = {
-      'dining': ['餐廳','吃飯','鼎泰豐','藏壽司','壽司','火鍋','燒肉','牛排','居酒屋','星巴克','路易莎','外送','ubereats','foodpanda'],
-      'shop': ['uniqlo','zara','無印','h&m','net','gu','nike','adidas','outlet','百貨','sogo','新光','遠東']
+      // 餐飲饗宴
+      'dining': [
+        '餐廳','吃飯','外送','ubereats','foodpanda', 
+        '王品','享鴨','夏慕尼','西堤','石二鍋','陶板屋','青花驕', 
+        '饗賓','饗饗','開飯','瓦城','鼎泰豐','海底撈','金大鋤','築間', 
+        '壽司郎','藏壽司','爭鮮','吉兆','明壽司','壽司', 
+        '金色三麥','春大直','貳樓','涓豆腐','hooters','勝田', 
+        '麥當勞','星巴克','必勝客','達美樂', 
+        '富王','文公館','教父牛排','山海樓','鹽之華','牡丹','logy','inita', 
+        'ikea','莫凡彼','貴族世家'
+      ],
+      // 百貨購物 & 指定網購 (含 Outlet、美妝、Momo、蝦皮...)
+      'shop': [
+        // 線上購物 (Live+ 特色!)
+        'momo','pchome','蝦皮','shopee','amazon','ebay','露天','friday','gomaji','淘寶',
+        // 服飾/運動
+        'uniqlo','zara','h&m','net','gu','nike','adidas','outlet', 
+        // 大型百貨
+        '台北101','三井','微風','sogo','漢神','華泰','新光','skm','att', 
+        '美麗華','南紡','統一時代','遠雄','京站','citylink','夢時代','lalaport', 
+        '高島屋','中友','遠企','麗寶','比漾','大江','巨城','遠東','global mall','環球', 
+        '義大','台茂','宏匯','義享','noke','大魯閣','明曜','bellavita', 
+        // 生活藥妝
+        '寶雅','無印良品','muji','屈臣氏','康是美','松本清','唐吉訶德'
+      ],
+      // 娛樂休閒 (遊樂園、電影、景點)
+      'entertainment': [
+        '新光影城','威秀','國賓','秀泰', 
+        '環球影城','迪士尼','吉卜力','樂天世界','legoland','safari', 
+        '兒童新樂園','x park','小人國','六福村','海洋公園','麗寶樂園','劍湖山','九族','尚順','義大遊樂', 
+        '巧虎','動物園','海生館','奇美博物館','小叮噹','野柳','埔心','飛牛','頑皮世界','美術館', 
+        '日月潭','太平山','阿里山','大雪山','墾丁','森林遊樂區'
+      ]
     };
 
     // --- 狀態管理 ---
@@ -421,7 +452,6 @@
       const raw = localStorage.getItem(DB_KEY);
       if(!raw) return initDB();
       const db = JSON.parse(raw);
-      // v8.4 補丁: 確保有 autopay 設定
       if(typeof db.settings.hsbc_autopay === 'undefined') db.settings.hsbc_autopay = true;
       if(typeof db.settings.dbs_autopay === 'undefined') db.settings.dbs_autopay = true;
       return db;
@@ -432,14 +462,14 @@
         settings: {
           enabledBuiltins: BUILTIN_DEFS.map(c => c.id),
           billingDays: { ...DEFAULT_BILLING },
-          hsbc_autopay: true, // 預設開啟
-          dbs_autopay: true   // 預設開啟
+          hsbc_autopay: true, 
+          dbs_autopay: true
         },
         customCards: [], records: {}, limits: {}
       };
     }
 
-    // --- 計算核心 (v8.4 修正版) ---
+    // --- 計算核心 (v8.5) ---
 
     function calculate() {
       const db = loadDB();
@@ -477,10 +507,14 @@
         }
       }
 
-      // Live+ 判斷
+      // Live+ 判斷 (v8.5 更新: 加入娛樂類別)
       if(cat==='dining') isLiveSelect = true;
       else {
-        if(LIVE_KEYWORDS['dining'].some(w => kw.includes(w)) || LIVE_KEYWORDS['shop'].some(w => kw.includes(w))) {
+        if(
+          LIVE_KEYWORDS['dining'].some(w => kw.includes(w)) || 
+          LIVE_KEYWORDS['shop'].some(w => kw.includes(w)) ||
+          LIVE_KEYWORDS['entertainment'].some(w => kw.includes(w))
+        ) {
           isLiveSelect = true;
         }
       }
@@ -763,7 +797,7 @@
     
     function renderSettings() {
       const db = loadDB();
-      // v8.4 新增: 設定自動扣繳開關
+      // 設定自動扣繳開關
       $('setting-hsbc-autopay').checked = db.settings.hsbc_autopay;
       $('setting-dbs-autopay').checked = db.settings.dbs_autopay;
 
@@ -865,7 +899,7 @@
        const blob = new Blob([JSON.stringify(db,null,2)], {type : 'application/json'});
        const a = document.createElement('a');
        a.href = URL.createObjectURL(blob);
-       a.download = 'miles_backup_v8_4.json';
+       a.download = 'miles_backup_v8_5.json';
        a.click();
     }
     window.onload = function() { updateStatusUI(); };

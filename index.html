@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>哩程攻略 v8.2 (專業精算版)</title>
+  <title>哩程攻略 v8.4 (最終完全版)</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Varela+Round&family=Mali:wght@500;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -11,7 +11,7 @@
 
   <style>
     /* =========================
-       CSS 樣式表 (延續 v8.1 可愛風格)
+       CSS 樣式表 (v8.1~v8.4 統一風格)
        ========================= */
     :root {
       --bg-main: #fffdf9;
@@ -156,7 +156,6 @@
     .card-name { font-size: 1.1rem; font-weight: 800; color: var(--text-header); margin: 0; }
     .card-miles { font-size: 1.3rem; color: #34d399; font-weight: 900; font-family: var(--font-hand); }
     .card-tpm { font-size: 0.75rem; color: #94a3b8; font-weight: 700; background: #fff; padding: 2px 8px; border-radius: 10px; display: inline-block; border: 1px solid #e2e8f0; }
-    .benefit-tag { font-size:0.75rem; color:#fff; background:#64748b; padding:2px 6px; border-radius:4px; margin-left:6px; vertical-align:middle; }
 
     /* Bottom Nav */
     .nav-bottom {
@@ -209,8 +208,8 @@
     <div class="d-flex align-items-center">
       <div class="header-icon"><i class="fa-solid fa-plane-departure"></i></div>
       <div class="header-title">
-        <h5>哩程攻略 v8.2</h5>
-        <small>專業精算版 (2026規則)</small>
+        <h5>哩程攻略 v8.4</h5>
+        <small>最終完全版</small>
       </div>
     </div>
     <button class="btn-header" onclick="openSettings()"><i class="fa-solid fa-gear me-1"></i> 設定</button>
@@ -337,6 +336,18 @@
         <div class="modal-body">
           
           <div class="setting-section">
+            <div class="setting-title">加碼資格確認 (自動扣繳)</div>
+            <div class="switch-group mb-2">
+              <span class="switch-label">匯豐 Live+ 自動扣繳 <small class="text-muted fw-normal">(精選+1%)</small></span>
+              <input class="form-check-input" type="checkbox" id="setting-hsbc-autopay" onchange="updateGlobalSetting('hsbc_autopay', this.checked)">
+            </div>
+            <div class="switch-group">
+              <span class="switch-label">星展 傳說 自動扣繳 <small class="text-muted fw-normal">(符合高回饋)</small></span>
+              <input class="form-check-input" type="checkbox" id="setting-dbs-autopay" onchange="updateGlobalSetting('dbs_autopay', this.checked)">
+            </div>
+          </div>
+
+          <div class="setting-section">
             <div class="setting-title">內建神卡 (複雜邏輯)</div>
             <div id="builtin-cards-list">
               </div>
@@ -375,12 +386,12 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     /* =========================
-       哩程攻略 v8.2 - 專業精算版 (2026規則)
+       哩程攻略 v8.4 - 最終完全版
        ========================= */
 
     const BUILTIN_DEFS = [
       { id: 'hsbc_live', name: '匯豐 Live+', default: true, note: '餐飲購物神卡' },
-      { id: 'cube',      name: '國泰 CUBE',  default: true, note: '世界卡 300點=1000哩' },
+      { id: 'cube',      name: '國泰 CUBE',  default: true, note: '小樹點 360點=1000哩' },
       { id: 'dbs_garena',name: '星展 傳說對決',default: true, note: 'LinePay 10%' },
       { id: 'ctbc_ci',   name: '中信 華航鼎尊',default: true, note: '生日月 $6/哩' },
       { id: 'taishin_cx',name: '台新 國泰世界',default: true, note: '越飛有哩 $5/哩' },
@@ -409,20 +420,26 @@
     function loadDB() {
       const raw = localStorage.getItem(DB_KEY);
       if(!raw) return initDB();
-      return JSON.parse(raw);
+      const db = JSON.parse(raw);
+      // v8.4 補丁: 確保有 autopay 設定
+      if(typeof db.settings.hsbc_autopay === 'undefined') db.settings.hsbc_autopay = true;
+      if(typeof db.settings.dbs_autopay === 'undefined') db.settings.dbs_autopay = true;
+      return db;
     }
     function saveDB(data) { localStorage.setItem(DB_KEY, JSON.stringify(data)); }
     function initDB() {
       return {
         settings: {
           enabledBuiltins: BUILTIN_DEFS.map(c => c.id),
-          billingDays: { ...DEFAULT_BILLING }
+          billingDays: { ...DEFAULT_BILLING },
+          hsbc_autopay: true, // 預設開啟
+          dbs_autopay: true   // 預設開啟
         },
         customCards: [], records: {}, limits: {}
       };
     }
 
-    // --- 計算核心 (v8.2 修正版) ---
+    // --- 計算核心 (v8.4 修正版) ---
 
     function calculate() {
       const db = loadDB();
@@ -474,50 +491,55 @@
 
       let results = [];
 
-      // 1. 國泰 CUBE (世界卡 300點=1000哩)
+      // 1. 國泰 CUBE (360點=1000哩)
       if(db.settings.enabledBuiltins.includes('cube')) {
         let pRate = 0.003; 
         let planName = '一般消費(0.3%)';
         
-        // 權益名稱對照
-        const planMap = { 
-          'travel': '趣旅行', 'dining': '樂饗購', 'digital': '玩數位', 'select': '集精選' 
-        };
+        const planMap = { 'travel':'趣旅行', 'dining':'樂饗購', 'digital':'玩數位', 'select':'集精選' };
 
         if(cubePlan !== 'unknown' && planMap[cubePlan]) {
           pRate = 0.03;
           planName = `切換至【${planMap[cubePlan]}】(3%)`;
-        } else if(isForeign) { // 沒關鍵字但國外
+        } else if(isForeign) { 
            pRate = 0.03; planName = `切換至【趣旅行】(3%)`;
         }
 
         const rawPoints = Math.floor(twdBase * pRate);
-        // 世界卡比例修正: 300點 = 1000哩 (約 3.33倍)
-        const finalMiles = Math.floor(rawPoints * (1000 / 300)); 
+        const finalMiles = Math.floor(rawPoints * (1000 / 360)); 
         
         results.push({ 
           id:'cube', name:'國泰 CUBE', 
           miles: finalMiles, 
-          note: `${planName}<br><span class="text-muted small">世界卡 300點⇄1000哩</span>`, 
+          note: `${planName}<br><span class="text-muted small">360點⇄1000哩</span>`, 
           type:'mile' 
         });
       }
 
-      // 2. 匯豐 Live+ (1點=2哩)
+      // 2. 匯豐 Live+ (1點=2哩) - 自動扣繳加碼
       if(db.settings.enabledBuiltins.includes('hsbc_live')) {
         let pRate = 0.0088; // 一般 0.88%
         let note = '一般 0.88%';
+        const hasAutopay = db.settings.hsbc_autopay; // 檢查設定
         
         if(isLiveSelect) {
-          pRate = 0.0388; note = '精選 3.88%';
-          if(isForeign) { // 這裡假設精選國外不疊加，依 Live+ 條款通常精選優先
-             // 若有綁定自動扣繳+1% -> 4.88% (這裡簡化以 3.88/4.88 為主)
-             pRate = 0.0488; note = '精選+加碼 4.88%';
+          // 精選: 3.88% (基本) + 1% (若有扣繳)
+          pRate = 0.0388;
+          if(hasAutopay) pRate += 0.01; 
+          
+          note = hasAutopay ? '精選+扣繳 4.88%' : '精選 3.88%';
+
+          if(isForeign) { 
+             // 國外精選: 4.88% (基本) + 1% (若有扣繳) -> 5.88%
+             pRate = 0.0488;
+             if(hasAutopay) pRate += 0.01;
+             
+             note = hasAutopay ? '精選+扣繳+國外 5.88%' : '精選+國外 4.88%';
           }
         }
         
         const cashPoints = Math.floor(twdBase * pRate);
-        const finalMiles = cashPoints * 2; // 修正比例: 1點換2哩
+        const finalMiles = cashPoints * 2; 
 
         results.push({ 
           id:'hsbc_live', name:'匯豐 Live+', 
@@ -527,19 +549,23 @@
         });
       }
 
-      // 3. 星展 傳說對決 (LinePay 10%)
+      // 3. 星展 傳說對決 (LinePay 10%) - 需自動扣繳
       if(db.settings.enabledBuiltins.includes('dbs_garena')) {
-        let pRate = 0.01; // 國內一般 1% (100元1點) => 1點=2哩 => 2哩/100元 = 50元/哩
+        let pRate = 0.01; 
         let note = '一般1% (約50元/哩)';
+        const hasAutopay = db.settings.dbs_autopay;
         
         if(pay === 'line_pay') {
-          pRate = 0.1; // 10%
-          note = 'LinePay 10% (約5元/哩)';
+          if(hasAutopay) {
+            pRate = 0.1; // 有扣繳才給 10%
+            note = 'LinePay 10% (有扣繳)';
+          } else {
+            // 沒扣繳通常只有基本回饋
+            note = 'LinePay (無扣繳 1%)';
+          }
         }
         
-        // 修正: 1點 = 1元現金積點
         const pts = Math.floor(twdBase * pRate);
-        // 修正兌換: 50點 = 100哩 (長榮/亞萬) => 1點 = 2哩
         const finalMiles = pts * 2;
         
         results.push({ 
@@ -554,42 +580,26 @@
       if(db.settings.enabledBuiltins.includes('ctbc_ci')) {
         let div = 18;
         if(isForeign || cat === 'flight_ci') div = 9;
-        
         let note = `約${div}元/哩`;
         
         if(isBirthday && (isForeign || cat === 'flight_ci')) {
           div = 6;
           note = `生日月 $6/哩 <span class="text-danger small">(刷40萬上限)</span>`;
         }
-        
-        results.push({ 
-          id:'ctbc_ci', name:'中信 華航', 
-          miles: Math.floor(twdSpend/div), 
-          note: note, 
-          type:'mile' 
-        });
+        results.push({ id:'ctbc_ci', name:'中信 華航', miles: Math.floor(twdSpend/div), note: note, type:'mile' });
       }
 
       // 5. 台新 國泰世界 (越飛有哩)
       if(db.settings.enabledBuiltins.includes('taishin_cx')) {
-        let div = isForeign ? 10 : 20; // 基本: 國外10/國內20 (簡化) -> 實際上越飛有哩是海外實體
+        let div = isForeign ? 10 : 20; 
         let note = `約${div}元/哩`;
-
-        // 越飛有哩: 海外實體 / 指定旅遊 $5/哩
-        // 需判斷是否符合類別
         const isTarget = (isForeign && pay==='physical') || cat==='travel' || ['agoda','booking','klook','kkday'].some(w=>kw.includes(w));
         
         if(isFlyMode && isTarget) {
           div = 5;
           note = `越飛有哩 $5/哩 <span class="text-danger small">(年上限20萬哩)</span>`;
         }
-
-        results.push({ 
-          id:'taishin_cx', name:'台新 國泰', 
-          miles: Math.floor(twdSpend/div), 
-          note: note, 
-          type:'mile' 
-        });
+        results.push({ id:'taishin_cx', name:'台新 國泰', miles: Math.floor(twdSpend/div), note: note, type:'mile' });
       }
 
       // 6. 匯豐 旅人 (國外10)
@@ -611,8 +621,7 @@
         });
       });
 
-      // 排序: 里程高者優先
-      // (v8.2 全部都已經統一轉成 "Mile" 單位了，直接比大小)
+      // 排序
       results.forEach(r => {
         r.tpm = r.miles > 0 ? (twdSpend / r.miles) : 999;
       });
@@ -622,7 +631,7 @@
       renderResults(results, twdSpend);
     }
 
-    // --- 渲染與輔助功能 (維持 v8.1) ---
+    // --- 渲染與輔助功能 ---
 
     function renderResults(list, spend) {
       const con = $('cards-container');
@@ -657,7 +666,6 @@
       });
     }
 
-    // 記帳、上限、設定功能 (保持不變)
     function getBillingCycle(cardPrefix, billingDay) {
       const now = new Date();
       const today = now.getDate();
@@ -718,7 +726,7 @@
       let limitHtml = '';
       const targets = [
         { id: 'hsbc_live', name: '匯豐 Live+', limit: 29600, type:'spend' }, 
-        { id: 'dbs_garena', name: '星展 傳說', limit: 1000, type:'point' } // 這裡還是監控原始點數概念比較準，但為簡化先顯示累積
+        { id: 'dbs_garena', name: '星展 傳說', limit: 1000, type:'point' }
       ];
 
       targets.forEach(t => {
@@ -728,8 +736,7 @@
         const dataKey = `${cycleKey}-${t.id}`;
         const record = db.limits[dataKey] || { spend:0, points:0 };
         
-        // 傳說對決上限是看點數，Live+看刷卡額
-        const current = t.type === 'spend' ? record.spend : Math.floor(record.points / 2); // 傳說的回推原始點數
+        const current = t.type === 'spend' ? record.spend : Math.floor(record.points / 2); 
         const percent = Math.min(100, Math.round((current / t.limit) * 100));
         
         let color = 'bg-success';
@@ -756,6 +763,10 @@
     
     function renderSettings() {
       const db = loadDB();
+      // v8.4 新增: 設定自動扣繳開關
+      $('setting-hsbc-autopay').checked = db.settings.hsbc_autopay;
+      $('setting-dbs-autopay').checked = db.settings.dbs_autopay;
+
       const builtinCon = $('builtin-cards-list');
       builtinCon.innerHTML = '';
       BUILTIN_DEFS.forEach(def => {
@@ -795,6 +806,11 @@
       }
     }
 
+    function updateGlobalSetting(key, val) {
+      const db = loadDB();
+      db.settings[key] = val;
+      saveDB(db);
+    }
     function toggleBuiltin(id) {
       const db = loadDB();
       const idx = db.settings.enabledBuiltins.indexOf(id);
@@ -849,7 +865,7 @@
        const blob = new Blob([JSON.stringify(db,null,2)], {type : 'application/json'});
        const a = document.createElement('a');
        a.href = URL.createObjectURL(blob);
-       a.download = 'miles_backup_v8_2.json';
+       a.download = 'miles_backup_v8_4.json';
        a.click();
     }
     window.onload = function() { updateStatusUI(); };
